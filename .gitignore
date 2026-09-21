@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*
+/.agents/
+/.claude/
+/.codex/
+/node_modules/
+/skills-lock.json
