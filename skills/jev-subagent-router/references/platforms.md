@@ -1,6 +1,6 @@
 # 平台模型与 effort
 
-研究快照：2026-09-20。Codex 数据同时由当前工具 schema 和本机 `models_cache.json` 核实；Claude Code 本机版本为 2.1.272。使用时以当前宿主允许的集合为准。
+模型 ID 复核：2026-09-21；effort 研究快照：2026-09-20。Codex 数据同时由当前工具 schema 和本机 `models_cache.json` 核实；Claude Code 本机版本为 2.1.272。使用时以当前宿主允许的集合为准。
 
 ## Codex
 
@@ -33,7 +33,7 @@ model_reasoning_effort = "medium"
 
 OpenAI API 与 Codex 不是同一参数面。例如 Sol API 文档列出 `none`、`low`、`medium`、`high`、`xhigh`、`max`，而本机 Codex 列出上表集合。不得把 API 的 `none` 或宽泛类型里的 `minimal` 自动加入 Codex 子代理候选。`ultra` 在本机描述中包含自动委派语义，必须满足嵌套委派限制。
 
-来源：[Codex 子代理与配置](https://learn.chatgpt.com/docs/agent-configuration/subagents)、[Sol API](https://developers.openai.com/api/docs/models/gpt-5.6-sol)、[Astra API](https://developers.openai.com/api/docs/models/gpt-6-astra)。当前运行时工具 schema 是模型覆盖和 fork 参数的直接依据。
+来源：[Codex 子代理与配置](https://learn.chatgpt.com/docs/agent-configuration/subagents)、[Sol API](https://developers.openai.com/api/docs/models/gpt-5.6-sol)、[Terra API](https://developers.openai.com/api/docs/models/gpt-5.6-terra)、[Luna API](https://developers.openai.com/api/docs/models/gpt-5.6-luna)、[Astra API](https://developers.openai.com/api/docs/models/gpt-6-astra)。当前运行时工具 schema 是模型覆盖和 fork 参数的直接依据。
 
 ## Claude Code
 
@@ -62,7 +62,7 @@ Sonnet 5 用于常规任务；Opus 5 用于复杂代理工作；Fable 5.1 用于
 
 ```markdown
 ---
-name: jev-cancellation-review
+name: jev-claude-opus-5-high
 description: 核对取消请求与写入完成之间的状态所有权
 model: claude-opus-5
 effort: high
@@ -70,6 +70,6 @@ effort: high
 分析主模型交付的子任务，返回有证据的结论和验证结果。
 ```
 
-模型逐次调用参数可覆盖定义中的模型；effort 可在定义中覆盖会话。`Agent` 工具逐次参数是否包含 effort，须读当次 schema，不能由 CLI 支持推断。存在 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`、组织模型限制或 effort cap 时，核对最终生效值。
+本 skill 通过代理定义固定完整模型 ID 和 effort，调用 `Agent` 时只指定 `subagent_type` 与任务内容。逐次 `model` 参数会覆盖定义，因此派发时省略该参数。完整模型 ID 在 frontmatter 中受支持，与工具逐次 `model` 参数的别名枚举分别判断。存在 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`、组织模型限制或 effort cap 时，核对最终生效值。
 
 来源：[模型 ID 与版本](https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions)、[当前模型目录](https://platform.claude.com/docs/en/models/overview)、[模型配置和 effort 表](https://code.claude.com/docs/en/model-config)、[原生子代理定义与优先级](https://code.claude.com/docs/en/sub-agents)、[API effort](https://platform.claude.com/docs/en/build-with-claude/effort)。

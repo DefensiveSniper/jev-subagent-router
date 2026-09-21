@@ -1,6 +1,7 @@
 ---
-name: jev-route-medium
-description: 仅在主模型已通过 Jev 选择 medium effort 后调用，逐次 model 参数由 Jev 结果指定。
+name: jev-claude-sonnet-5-medium
+description: 仅在 Jev 选择 claude-sonnet-5 与 medium effort 时调用，完成主模型分配的有界子任务。
+model: claude-sonnet-5
 effort: medium
 ---
 

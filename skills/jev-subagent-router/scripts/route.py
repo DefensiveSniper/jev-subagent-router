@@ -181,6 +181,9 @@ def parse_response(response, payload):
         }
     else:
         result["agent_frontmatter"] = {"model": selected["model"], "effort": selected["effort"]}
+        result["agent_parameters"] = {
+            "subagent_type": "jev-" + selected["model"] + "-" + selected["effort"],
+        }
     return result
 
 

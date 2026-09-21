@@ -40,6 +40,21 @@ def answer(payload):
 
 
 class RouterTests(unittest.TestCase):
+    def test_jev_selects_one_complete_model_effort_pair(self):
+        for platform, count in [("codex", 23), ("claude-code", 19)]:
+            payload = route.build_request(task(platform, True))
+            self.assertEqual(set(payload["questions"]), {"route"})
+            question = payload["questions"]["route"]
+            self.assertEqual(question["type"], "choice")
+            self.assertEqual(len(question["criteria"]), count)
+            for key, value in question["criteria"].items():
+                self.assertEqual(key, value["model"] + "@" + value["effort"])
+            if platform == "claude-code":
+                self.assertIn("claude-opus-5@low", question["criteria"])
+                self.assertIn("claude-opus-5@high", question["criteria"])
+                self.assertIn("claude-opus-4-6@high", question["criteria"])
+                self.assertNotIn("claude-opus-4-6@xhigh", question["criteria"])
+
     def test_nested_delegation_filters_ultra(self):
         plain = route.build_request(task())["questions"]["route"]["criteria"]
         nested = route.build_request(task(nested=True))["questions"]["route"]["criteria"]
@@ -64,6 +79,37 @@ class RouterTests(unittest.TestCase):
                             })
                         else:
                             self.assertEqual(result["agent_frontmatter"], {"model": model, "effort": effort})
+                            parameters = result["agent_parameters"]
+                            self.assertEqual(set(parameters), {"subagent_type"})
+                            definition = ROOT / "skills/jev-subagent-router/assets/claude-agents" / (parameters["subagent_type"] + ".md")
+                            frontmatter = dict(
+                                line.split(": ", 1) for line in definition.read_text().split("---", 2)[1].strip().splitlines()
+                            )
+                            self.assertEqual(frontmatter["name"], parameters["subagent_type"])
+                            self.assertEqual(frontmatter["model"], model)
+                            self.assertEqual(frontmatter["effort"], effort)
+
+    def test_catalog_uses_exact_model_ids(self):
+        self.assertEqual(set(route.CATALOG["codex"]), {
+            "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra",
+        })
+        self.assertEqual(set(route.CATALOG["claude-code"]), {
+            "claude-opus-5", "claude-opus-4-6", "claude-sonnet-5", "claude-fable-5-1",
+        })
+        for platform, alias in [("codex", "gpt-5.6"), ("claude-code", "opus"), ("claude-code", "opus-5")]:
+            data = task(platform)
+            data["available"] = {alias: ["high"]}
+            with self.assertRaises(ValueError):
+                route.build_request(data)
+
+    def test_all_claude_templates_are_reachable(self):
+        expected = {
+            f"jev-{model}-{effort}.md"
+            for model, spec in route.CATALOG["claude-code"].items()
+            for effort in spec["efforts"]
+        }
+        directory = ROOT / "skills/jev-subagent-router/assets/claude-agents"
+        self.assertEqual({p.name for p in directory.glob("*.md")}, expected)
 
     def test_invalid_task_or_capabilities(self):
         cases = [

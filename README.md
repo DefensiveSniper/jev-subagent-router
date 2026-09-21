@@ -38,7 +38,7 @@ launchctl setenv JEV_API_KEY "$JEV_API_KEY"
 
 密钥只从进程环境读取。不要把真实密钥放进仓库、命令参数或对话。路由会向 TypeSafe 发送主模型整理的任务摘要和候选描述。
 
-Claude Code 首次使用时，主模型根据 skill 指令，把随包安装的五个 [effort 子代理定义](skills/jev-subagent-router/assets/claude-agents) 放入 `~/.claude/agents/`。每个定义固定一个 effort，每次调用再传入 Jev 选择的模型；安装命令本身只安装 skill 文件。已有同名定义会先检查，保留用户定制。
+Claude Code 首次使用时，主模型根据 skill 指令，把随包安装的 19 个 [模型与 effort 子代理定义](skills/jev-subagent-router/assets/claude-agents) 放入 `~/.claude/agents/`。每个定义固定完整模型 ID 和 effort，每次调用使用 Jev 返回的 `subagent_type`；安装命令本身只安装 skill 文件。已有同名定义会先检查，保留用户定制。
 
 ## 支持范围
 
@@ -75,7 +75,7 @@ npx --yes skills update jev-subagent-router --global --yes
 npx --yes skills remove jev-subagent-router --agent codex claude-code --global --yes
 ```
 
-Claude Code 的五个 effort 定义独立保存在 `~/.claude/agents/jev-route-*.md`。更新 skill 后，主模型应比较这些定义与随包模板；移除 skill 后，如已不再使用这些定义，可删除对应五个文件。
+Claude Code 的 19 个组合定义独立保存在 `~/.claude/agents/jev-claude-*.md`。更新 skill 后，主模型应比较这些定义与随包模板；移除 skill 后，如已不再使用这些定义，可删除对应模板文件。
 
 ## 项目关系
 

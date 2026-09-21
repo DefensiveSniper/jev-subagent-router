@@ -37,6 +37,14 @@ launchctl setenv JEV_API_KEY "$JEV_API_KEY"
 
 ## 收集候选与任务事实
 
+以下是请求和配置中使用的精确 ID；简称只用于与用户交流：
+
+| 平台 | 精确模型 ID |
+| --- | --- |
+| Codex | `gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra` |
+| Claude Code | `claude-opus-5`、`claude-opus-4-6`、`claude-sonnet-5`、`claude-fable-5-1` |
+
+
 读取 [平台参数](references/platforms.md)，只处理当前宿主。模型限于该平台表内的四个 ID。将当前工具 schema、模型列表及组织限制确认允许的组合填入 `available`，不能把研究快照直接当成账号权限。
 
 显式指定的模型或 effort 是硬约束：据此缩小候选，再让 Jev 选择剩余维度。完全指定的组合也保留单项候选，校验后由 Jev 返回。候选为空时报告具体能力限制，不替换为表外模型。
@@ -98,13 +106,25 @@ Claude Code 使用 `platform: "claude-code"` 和对应四个模型的合法 effo
 
 ### Claude Code
 
-读取当前 `Agent` 工具 schema：若明确支持逐次传入完整模型 ID 和 effort，则直接应用返回的配置。否则按官方支持的子代理定义设置 `model` 与 `effort`，再由 `Agent` 的 `subagent_type` 调用。
+使用 [Claude 子代理定义](assets/claude-agents) 中固定完整模型 ID 和 effort 的 19 个模板。每个文件的 `name` 为 `jev-<完整模型ID>-<effort>`，frontmatter 同时写入精确 `model` 和 `effort`。多个子任务可以并发复用同一配置，不在派发前改写模板。
 
-本 skill 附带 [Claude 子代理定义](assets/claude-agents)，按五个 effort 提供可复用的 `jev-route-low`、`jev-route-medium`、`jev-route-high`、`jev-route-xhigh`、`jev-route-max`。首次在 Claude Code 使用时，把这五个文件安装到 `~/.claude/agents/`；同名定义已存在则先检查，保留用户定制。它们是持续使用的代理配置。首次创建 agents 目录可能需要重启会话，先确认定义已被发现再委派。
+首次使用或更新 skill 时，把这些定义同步到 `~/.claude/agents/`；已有同名定义先检查，保留用户定制。调用前确认所选定义的 `model` 与 `effort` 和 Jev 结果一致，并且宿主已经发现它。首次创建 agents 目录可能需要重启会话。
 
-调用 `Agent` 时，以 `jev-route-<返回的 effort>` 为 `subagent_type`，将返回的完整模型 ID 传入逐次 `model` 字段，在 `prompt` 中传入完整子任务上下文与约束。这样每个定义只负责一个 effort，各任务的模型独立选择。当前工具若不接受完整 ID，也无法用已有配置准确落实结果，则报告能力限制，不用家族别名替换指定版本。
+`route.py` 返回 `agent_parameters.subagent_type`，原样传入 `Agent`，再提供该工具要求的任务描述和完整 `prompt`。调用时省略 `model` 和 `effort`，让完整版本与推理档位从定义生效；逐次 `model` 参数的优先级高于定义，会覆盖已固定的模型。
 
-不在未提供该字段的工具调用中编造 `effort` 参数。不要靠改主会话的 effort 或全局子代理环境变量实现逐任务选择。若宿主强制模型或 effort、无法加载定义，当前环境不能落实此组合，应先报告限制。
+例如 Jev 选择 `claude-opus-4-6` 与 `high`，派发：
+
+```json
+{
+  "subagent_type": "jev-claude-opus-4-6-high",
+  "description": "分析取消请求与写入完成之间的竞争",
+  "prompt": "在此提供完整子任务、上下文、约束和验收标准。"
+}
+```
+
+对应定义包含 `model: claude-opus-4-6` 与 `effort: high`。工具的逐次 `model` 字段只接受家族别名，不代表定义也受此限制；不能仅因此从候选集合删除 Opus 4.6。候选是否可用应结合账号模型权限、定义支持和强制配置判断。
+
+如果宿主无法加载完整 ID 的定义，或强制配置使选定组合不能生效，报告实际限制。模型别名 `opus`、`sonnet`、`fable` 不用于替代精确版本。
 
 ### 验证执行状态
 
