@@ -55,6 +55,17 @@ class RouterTests(unittest.TestCase):
                 self.assertIn("claude-opus-4-6@high", question["criteria"])
                 self.assertNotIn("claude-opus-4-6@xhigh", question["criteria"])
 
+    def test_every_candidate_carries_price_and_platform_effort_semantics(self):
+        for platform in route.CATALOG:
+            criteria = route.build_request(task(platform, True))["questions"]["route"]["criteria"]
+            for key, value in criteria.items():
+                with self.subTest(candidate=key):
+                    self.assertRegex(value["list_price"], r"\$\d")
+                    self.assertEqual(value["effort_profile"], route.EFFORTS[platform][value["effort"]])
+                    self.assertTrue(value["model_profile"].strip())
+        self.assertNotEqual(route.EFFORTS["codex"]["medium"], route.EFFORTS["claude-code"]["medium"])
+        self.assertNotIn("xhigh", route.CATALOG["claude-code"]["claude-opus-4-6"]["efforts"])
+
     def test_nested_delegation_filters_ultra(self):
         plain = route.build_request(task())["questions"]["route"]["criteria"]
         nested = route.build_request(task(nested=True))["questions"]["route"]["criteria"]
@@ -144,6 +155,21 @@ class RouterTests(unittest.TestCase):
             bad["answers"]["route"].update(change)
             with self.subTest(change=change), self.assertRaises(ValueError):
                 route.parse_response(bad, payload)
+
+    def test_rounded_probabilities_are_accepted_but_wrong_totals_are_not(self):
+        payload = route.build_request(task("codex", True))
+        keys = list(payload["questions"]["route"]["criteria"])
+        rounded = answer(payload)
+        # 20 个候选各四舍五入到两位小数，总和 0.99 是 Jev 的真实返回形态。
+        rounded["answers"]["route"]["probabilities"] = {k: 0.01 for k in keys}
+        rounded["answers"]["route"]["probabilities"][keys[-1]] = 0.99 - 0.01 * (len(keys) - 1)
+        rounded["answers"]["route"]["choice"] = keys[-1]
+        self.assertEqual(route.parse_response(rounded, payload)["model"], route.CATALOG["codex"][keys[-1].split("@")[0]] and keys[-1].split("@")[0])
+        broken = answer(payload)
+        broken["answers"]["route"]["probabilities"] = {k: 0.0 for k in keys}
+        broken["answers"]["route"]["probabilities"][keys[-1]] = 0.8
+        with self.assertRaises(ValueError):
+            route.parse_response(broken, payload)
 
     def test_request_through_cli_to_native_configuration(self):
         for platform in route.CATALOG:

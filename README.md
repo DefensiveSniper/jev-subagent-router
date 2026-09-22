@@ -47,7 +47,7 @@ Claude Code 首次使用时，主模型根据 skill 指令，把随包安装的 
 | Codex | `gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra` |
 | Claude Code | `claude-opus-5`、`claude-opus-4-6`、`claude-sonnet-5`、`claude-fable-5-1` |
 
-完整 effort 集合、研究日期与官方来源见 [平台参考](skills/jev-subagent-router/references/platforms.md)。实际路由只接受宿主当前确认可用且符合用户约束的组合。Codex 的 `ultra` 还要求嵌套委派已获准。
+每个候选带官方列表价、定位区分点和该平台的 effort 语义，让 Jev 能按"质量优先、够用里选最便宜"裁决。完整 effort 集合、定价、研究日期与官方来源见 [平台参考](skills/jev-subagent-router/references/platforms.md)。实际路由只接受宿主当前确认可用且符合用户约束的组合。Codex 的 `ultra` 还要求嵌套委派已获准。
 
 Jev 使用 `POST https://api.typesafe.ai/v1/systemone`，模型为 `jev-latest`。每个 Choice 选项代表一个完整的模型与 effort 组合。脚本只依赖 Python 标准库；鉴权失败、网络错误或无效响应会终止本次路由。见 [HTTP 契约](skills/jev-subagent-router/references/jev-api.md)。
 
