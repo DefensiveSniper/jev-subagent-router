@@ -28,39 +28,30 @@ EFFORTS = {
         "max": "Correctness matters more than cost; only when xhigh measurably leaves headroom.",
     },
 }
-# 价格为官方列表价（美元 / 百万 token，输入 / 输出），研究日期见 references/platforms.md。
+# 价格为官方列表价（美元 / 百万 token，输入 / 输出）。
 CATALOG = {
     "codex": {
-        "gpt-5.6-luna": {
+        "gpt-6-luna": {
             "efforts": [e for e in EFFORTS["codex"] if e != "ultra"],
-            "price": "$0.2 in / $1.2 out per 1M tokens; 1x, cheapest Codex candidate.",
+            "price": "$0.10 in / $0.50 out per 1M tokens; cheapest Codex candidate.",
             "profile": (
-                "Nano-tier model for cost-sensitive, high-volume, narrowly scoped and repeatable work: "
+                "Fast, low-cost model for cost-sensitive, high-volume, narrowly scoped and repeatable work: "
                 "mechanical edits, renames, format conversions, single-file lookups, simple tests. "
-                "1M context. Wrong choice for ambiguous, multi-step or judgement-heavy tasks."
+                "Avoid for ambiguous or judgement-heavy tasks."
             ),
         },
-        "gpt-5.6-terra": {
+        "gpt-6-sol": {
             "efforts": list(EFFORTS["codex"]),
-            "price": "$2 in / $12 out per 1M tokens; 10x Luna, 0.5x Sol.",
+            "price": "$2 in / $10 out per 1M tokens; 20x Luna, 0.2x Astra.",
             "profile": (
-                "Mini-tier model balancing intelligence and cost. Suited to exploration, read-heavy scans, "
-                "large-file review, processing supporting documents and routine implementation against a clear spec. "
-                "Falls short on planning-heavy or ambiguous multi-step work."
-            ),
-        },
-        "gpt-5.6-sol": {
-            "efforts": list(EFFORTS["codex"]),
-            "price": "$4 in / $20 out per 1M tokens; 2x Terra, 0.4x Astra.",
-            "profile": (
-                "Flagship GPT-5.6 (the gpt-5.6 alias) for ambiguous, multi-step professional work that needs "
+                "General-purpose coding model for ambiguous, multi-step professional work that needs "
                 "planning, tool use, validation and follow-through across a large context. "
-                "Default for demanding coding agents: cross-module changes, debugging without a clean reproduction, correctness review."
+                "Use for demanding coding agents: cross-module changes, debugging without a clean reproduction, correctness review."
             ),
         },
         "gpt-6-astra": {
             "efforts": list(EFFORTS["codex"]),
-            "price": "$10 in / $50 out per 1M tokens; 2.5x Sol, 50x Luna.",
+            "price": "$10 in / $50 out per 1M tokens; 5x Sol, 100x Luna.",
             "profile": (
                 "OpenAI's most capable model, built for the hardest end-to-end work: novel problems, deep research, "
                 "long-horizon autonomous coding and computer use. Reserve for tasks where Sol is likely to fall short: "
@@ -79,9 +70,9 @@ CATALOG = {
                 "analysis without a reproduction, and high-stakes judgement calls."
             ),
         },
-        "claude-opus-5": {
+        "claude-opus-5-5": {
             "efforts": list(EFFORTS["claude-code"]),
-            "price": "$5 in / $25 out per 1M tokens; 2.5x Sonnet, 0.5x Fable.",
+            "price": "$4 in / $20 out per 1M tokens; 2x Sonnet, 0.4x Fable.",
             "profile": (
                 "Strong general model for complex agentic coding: multi-file changes across coupled modules, "
                 "root-causing concurrency or state bugs, correctness review of large diffs, and designs with "
@@ -90,21 +81,20 @@ CATALOG = {
         },
         "claude-opus-4-6": {
             "efforts": ["low", "medium", "high", "max"],
-            "price": "$5 in / $25 out per 1M tokens; same as Opus 5.",
+            "price": "$5 in / $25 out per 1M tokens; writing specialist when instructions are explicit.",
             "profile": (
-                "Previous Opus generation at the same list price as Opus 5, without the xhigh effort level and weaker "
-                "on long-horizon agentic work. Choose it only when task-specific evidence in the state shows it does "
-                "better on this workload; otherwise Opus 5 dominates it."
+                "Writing specialist: follows clear instructions well and can produce strong prose. "
+                "Only offer for a writing task with an explicit brief covering the desired output, audience, "
+                "tone, structure and constraints. Do not use for coding or an underspecified writing request."
             ),
         },
         "claude-fable-5-1": {
             "efforts": list(EFFORTS["claude-code"]),
-            "price": "$10 in / $50 out per 1M tokens; 5x Sonnet, 2x Opus 5. Subscription plans meter Fable usage in a separate, tighter quota.",
+            "price": "$10 in / $50 out per 1M tokens; 5x Sonnet, 2.5x Opus 5.5. Subscription plans may meter Fable separately.",
             "profile": (
-                "Anthropic's most capable model. Distinct advantages over Opus 5: long-horizon autonomous work spanning "
+                "High-capability model for long-horizon autonomous work spanning "
                 "many tool calls without human checks, novel or underspecified problems, reconciling competing hypotheses, "
-                "and tasks where a wrong answer is costly and hard to verify. Reasoning is always on; lower effort on Fable "
-                "often matches high or xhigh on Opus. Single turns can run many minutes."
+                "and tasks where a wrong answer is costly and hard to verify. Single turns can run many minutes."
             ),
         },
     },
@@ -153,6 +143,12 @@ def build_request(data):
         spec = CATALOG[platform][model]
         if len(set(efforts)) != len(efforts) or any(e not in spec["efforts"] for e in efforts):
             raise ValueError("available 包含重复或不受支持的 effort")
+        if model == "claude-opus-4-6" and (
+            task.get("kind") != "writing"
+            or not isinstance(task.get("writing_instructions"), str)
+            or not task["writing_instructions"].strip()
+        ):
+            continue
         for effort in efforts:
             if effort == "ultra" and not nested:
                 continue

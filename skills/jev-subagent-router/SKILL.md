@@ -41,11 +41,11 @@ launchctl setenv JEV_API_KEY "$JEV_API_KEY"
 
 | 平台 | 精确模型 ID |
 | --- | --- |
-| Codex | `gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`、`gpt-6-astra` |
-| Claude Code | `claude-opus-5`、`claude-opus-4-6`、`claude-sonnet-5`、`claude-fable-5-1` |
+| Codex | `gpt-6-sol`、`gpt-6-luna`、`gpt-6-astra` |
+| Claude Code | `claude-opus-5-5`、`claude-opus-4-6`、`claude-sonnet-5`、`claude-fable-5-1` |
 
 
-读取 [平台参数](references/platforms.md)，只处理当前宿主。模型限于该平台表内的四个 ID。将当前工具 schema、模型列表及组织限制确认允许的组合填入 `available`，不能把研究快照直接当成账号权限。
+读取 [平台参数](references/platforms.md)，只处理当前宿主。模型限于该平台表内的精确 ID。将当前工具 schema、模型列表及组织限制确认允许的组合填入 `available`，不能把研究快照直接当成账号权限。Claude Code 使用 Opus 5.5 前，确认 CLI 版本至少为 2.1.280。
 
 显式指定的模型或 effort 是硬约束：据此缩小候选，再让 Jev 选择剩余维度。完全指定的组合也保留单项候选，校验后由 Jev 返回。候选为空时报告具体能力限制，不替换为表外模型。
 
@@ -57,6 +57,8 @@ launchctl setenv JEV_API_KEY "$JEV_API_KEY"
 - `acceptance`：完成条件与可执行的验证方式。
 - `constraints`：用户对质量、资源、模型及权限的要求，以及当前额度状态。订阅计划对某些模型单独计量时，写明该窗口已用比例，例如 `Fable weekly quota 63% used`。
 - `model_evidence`：可选。本项目里相关模型与 effort 的真实验证结果，例如"claude-sonnet-5@medium 完成过同类重构并通过测试"。
+
+考虑 Opus 4.6 时，另须把 `task.kind` 设为 `writing`，并在 `task.writing_instructions` 中说明写作目标、读者、语气、结构和约束。主模型在信息不足时先澄清，再把这份明确指令交给子代理；脚本只在两个字段有效时开放 Opus 4.6。
 
 除 `objective` 必填外，按实际情况提供其他字段；不要编造事实。主模型先提取摘要，不预先写死复杂度档位或推荐模型。候选描述已含官方列表价与定位区分点，摘要里不必重复价格；额度压力和项目证据只有主模型知道，必须由主模型填入。英文摘要更符合 Jev 当前语言优势，用户交流继续使用用户语言。
 
@@ -71,9 +73,8 @@ python3 scripts/route.py <<'JSON'
 {
   "platform": "codex",
   "available": {
-    "gpt-5.6-luna": ["low", "medium", "high", "xhigh", "max"],
-    "gpt-5.6-terra": ["low", "medium", "high", "xhigh", "max"],
-    "gpt-5.6-sol": ["low", "medium", "high", "xhigh", "max"],
+    "gpt-6-luna": ["low", "medium", "high", "xhigh", "max"],
+    "gpt-6-sol": ["low", "medium", "high", "xhigh", "max"],
     "gpt-6-astra": ["low", "medium", "high", "xhigh", "max"]
   },
   "nested_delegation": false,
@@ -89,13 +90,13 @@ python3 scripts/route.py <<'JSON'
 JSON
 ```
 
-Claude Code 使用 `platform: "claude-code"` 和对应四个模型的合法 effort。`nested_delegation` 只有在子代理继续委派已经获准且宿主支持时才设为 `true`；否则脚本从候选中移除带自动委派语义的 `ultra`。
+Claude Code 使用 `platform: "claude-code"` 和对应四个模型的合法 effort。写作任务若考虑 Opus 4.6，在 `task` 中填入上述两个字段。`nested_delegation` 只有在子代理继续委派已经获准且宿主支持时才设为 `true`；否则脚本从候选中移除带自动委派语义的 `ultra`。
 
 脚本把每个合法“模型 + effort”组合放入一个 Choice 的 `criteria`，一次请求联合选择，避免生成不合法的跨字段组合。`--dry-run` 可在不联网时检查请求；`--catalog codex` 或 `--catalog claude-code` 显示已核实的目录。接口细节见 [Jev API](references/jev-api.md)。
 
 正常输出包含 `model`、`effort`、`confidence`、`selected_probability` 和宿主配置。后两项是路由判断信号，不等于任务成功率。主模型使用返回的组合，不自行换成偏好模型。Jev 不生成理由；如需说明，用任务事实与已记录的候选描述解释，不声称是 Jev 的文字结论。
 
-每次 Jev 选型成功后、启动子代理前，主模型必须在用户可见的消息中输出：`任务：<子任务简述>｜模型：<Jev 返回的完整 model ID>｜effort：<Jev 返回的 effort>`。批量委派时逐项列出，重新选型后再次输出；不能仅保留在工具结果、日志或子代理提示词中。示例：`任务：分析取消请求与写入完成之间的竞争｜模型：claude-opus-5｜effort：high`。
+每次 Jev 选型成功后、启动子代理前，主模型必须在用户可见的消息中输出：`任务：<子任务简述>｜模型：<Jev 返回的完整 model ID>｜effort：<Jev 返回的 effort>`。批量委派时逐项列出，重新选型后再次输出；不能仅保留在工具结果、日志或子代理提示词中。示例：`任务：分析取消请求与写入完成之间的竞争｜模型：claude-opus-5-5｜effort：high`。
 
 非零退出表示路由未完成：停止该次委派并报告原因。缺少密钥走首次配置；网络、权限或响应错误修复后重新调用，不将失败当成有效选型。任务实质、候选或约束改变时重新路由；相同任务的进度查询和结果回收不重复请求。
 
@@ -115,13 +116,13 @@ Claude Code 使用 `platform: "claude-code"` 和对应四个模型的合法 effo
 
 `route.py` 返回 `agent_parameters.subagent_type`，原样传入 `Agent`，再提供该工具要求的任务描述和完整 `prompt`。调用时省略 `model` 和 `effort`，让完整版本与推理档位从定义生效；逐次 `model` 参数的优先级高于定义，会覆盖已固定的模型。
 
-例如 Jev 选择 `claude-opus-4-6` 与 `high`，派发：
+例如明确写作任务由 Jev 选择 `claude-opus-4-6` 与 `high`，派发：
 
 ```json
 {
   "subagent_type": "jev-claude-opus-4-6-high",
-  "description": "分析取消请求与写入完成之间的竞争",
-  "prompt": "在此提供完整子任务、上下文、约束和验收标准。"
+  "description": "撰写产品发布说明",
+  "prompt": "为现有用户撰写 300 字中文发布说明。语气准确、克制；先写变化，再写用户收益，最后列迁移步骤。只依据主模型提供的已确认事实。"
 }
 ```
 

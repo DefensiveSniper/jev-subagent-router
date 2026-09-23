@@ -17,11 +17,12 @@ route = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(route)
 
 
-def task(platform="codex", nested=False):
+def task(platform="codex", nested=False, writing=False):
     return {
         "platform": platform,
         "nested_delegation": nested,
-        "task": {"objective": "Trace a cancellation race.", "acceptance": "Return a reproducible proof."},
+        "task": ({"objective": "Write release notes.", "kind": "writing", "writing_instructions": "Write for existing users; accurate, restrained tone; changes, benefits, migration steps."}
+                 if writing else {"objective": "Trace a cancellation race.", "acceptance": "Return a reproducible proof."}),
         "available": {model: spec["efforts"][:] for model, spec in route.CATALOG[platform].items()},
     }
 
@@ -41,8 +42,8 @@ def answer(payload):
 
 class RouterTests(unittest.TestCase):
     def test_jev_selects_one_complete_model_effort_pair(self):
-        for platform, count in [("codex", 23), ("claude-code", 19)]:
-            payload = route.build_request(task(platform, True))
+        for platform, count in [("codex", 17), ("claude-code", 19)]:
+            payload = route.build_request(task(platform, True, platform == "claude-code"))
             self.assertEqual(set(payload["questions"]), {"route"})
             question = payload["questions"]["route"]
             self.assertEqual(question["type"], "choice")
@@ -50,14 +51,14 @@ class RouterTests(unittest.TestCase):
             for key, value in question["criteria"].items():
                 self.assertEqual(key, value["model"] + "@" + value["effort"])
             if platform == "claude-code":
-                self.assertIn("claude-opus-5@low", question["criteria"])
-                self.assertIn("claude-opus-5@high", question["criteria"])
+                self.assertIn("claude-opus-5-5@low", question["criteria"])
+                self.assertIn("claude-opus-5-5@high", question["criteria"])
                 self.assertIn("claude-opus-4-6@high", question["criteria"])
                 self.assertNotIn("claude-opus-4-6@xhigh", question["criteria"])
 
     def test_every_candidate_carries_price_and_platform_effort_semantics(self):
         for platform in route.CATALOG:
-            criteria = route.build_request(task(platform, True))["questions"]["route"]["criteria"]
+            criteria = route.build_request(task(platform, True, platform == "claude-code"))["questions"]["route"]["criteria"]
             for key, value in criteria.items():
                 with self.subTest(candidate=key):
                     self.assertRegex(value["list_price"], r"\$\d")
@@ -71,7 +72,7 @@ class RouterTests(unittest.TestCase):
         nested = route.build_request(task(nested=True))["questions"]["route"]["criteria"]
         self.assertFalse(any(key.endswith("@ultra") for key in plain))
         self.assertEqual(set(nested) - set(plain), {
-            "gpt-5.6-sol@ultra", "gpt-5.6-terra@ultra", "gpt-6-astra@ultra",
+            "gpt-6-sol@ultra", "gpt-6-astra@ultra",
         })
 
     def test_every_pair_maps_to_native_fields(self):
@@ -79,7 +80,7 @@ class RouterTests(unittest.TestCase):
             for model, spec in models.items():
                 for effort in spec["efforts"]:
                     with self.subTest(model=model, effort=effort):
-                        data = task(platform, True)
+                        data = task(platform, True, model == "claude-opus-4-6")
                         data["available"] = {model: [effort]}
                         payload = route.build_request(data)
                         result = route.parse_response(answer(payload), payload)
@@ -102,12 +103,12 @@ class RouterTests(unittest.TestCase):
 
     def test_catalog_uses_exact_model_ids(self):
         self.assertEqual(set(route.CATALOG["codex"]), {
-            "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-astra",
+            "gpt-6-sol", "gpt-6-luna", "gpt-6-astra",
         })
         self.assertEqual(set(route.CATALOG["claude-code"]), {
-            "claude-opus-5", "claude-opus-4-6", "claude-sonnet-5", "claude-fable-5-1",
+            "claude-opus-5-5", "claude-opus-4-6", "claude-sonnet-5", "claude-fable-5-1",
         })
-        for platform, alias in [("codex", "gpt-5.6"), ("claude-code", "opus"), ("claude-code", "opus-5")]:
+        for platform, alias in [("codex", "gpt-5.6-sol"), ("claude-code", "opus"), ("claude-code", "opus-5")]:
             data = task(platform)
             data["available"] = {alias: ["high"]}
             with self.assertRaises(ValueError):
@@ -122,12 +123,23 @@ class RouterTests(unittest.TestCase):
         directory = ROOT / "skills/jev-subagent-router/assets/claude-agents"
         self.assertEqual({p.name for p in directory.glob("*.md")}, expected)
 
+    def test_opus_4_6_requires_explicit_writing_instructions(self):
+        data = task("claude-code")
+        criteria = route.build_request(data)["questions"]["route"]["criteria"]
+        self.assertEqual(len(criteria), 15)
+        self.assertFalse(any(key.startswith("claude-opus-4-6@") for key in criteria))
+        data["available"] = {"claude-opus-4-6": ["high"]}
+        with self.assertRaisesRegex(ValueError, "没有可选组合"):
+            route.build_request(data)
+        data["task"] = {"objective": "Write release notes", "kind": "writing", "writing_instructions": "Audience: users; tone: factual; structure: changes, benefits, steps."}
+        self.assertIn("claude-opus-4-6@high", route.build_request(data)["questions"]["route"]["criteria"])
+
     def test_invalid_task_or_capabilities(self):
         cases = [
             {"platform": []}, {"available": {}}, {"task": {}},
-            {"available": {"gpt-5.6-luna": ["ultra"]}},
-            {"available": {"claude-opus-5": ["high"]}},
-            {"available": {"gpt-5.6-sol": ["high", "high"]}},
+            {"available": {"gpt-6-luna": ["ultra"]}},
+            {"available": {"claude-opus-5-5": ["high"]}},
+            {"available": {"gpt-6-sol": ["high", "high"]}},
             {"nested_delegation": "true"},
             {"task": {"objective": "x", "value": float("nan")}},
         ]
@@ -160,7 +172,7 @@ class RouterTests(unittest.TestCase):
         payload = route.build_request(task("codex", True))
         keys = list(payload["questions"]["route"]["criteria"])
         rounded = answer(payload)
-        # 20 个候选各四舍五入到两位小数，总和 0.99 是 Jev 的真实返回形态。
+        # Jev 概率逐项舍入后，总和可能偏离 1。
         rounded["answers"]["route"]["probabilities"] = {k: 0.01 for k in keys}
         rounded["answers"]["route"]["probabilities"][keys[-1]] = 0.99 - 0.01 * (len(keys) - 1)
         rounded["answers"]["route"]["choice"] = keys[-1]

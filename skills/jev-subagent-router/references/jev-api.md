@@ -39,8 +39,8 @@
       "type": "choice",
       "instructions": "Select the model and effort pair adequate for this task's reasoning demands and acceptance criteria.",
       "criteria": {
-        "gpt-5.6-terra@medium": "Balanced model; bounded multi-step analysis.",
-        "gpt-5.6-sol@high": "General coding model; deeper analysis of interacting logic."
+        "gpt-6-luna@medium": "Low-cost model; narrowly scoped work.",
+        "gpt-6-sol@high": "General coding model; deeper analysis of interacting logic."
       }
     }
   }
@@ -59,10 +59,10 @@
   "answers": {
     "route": {
       "type": "choice",
-      "choice": "gpt-5.6-sol@high",
+      "choice": "gpt-6-sol@high",
       "probabilities": {
-        "gpt-5.6-terra@medium": 0.2,
-        "gpt-5.6-sol@high": 0.8
+        "gpt-6-luna@medium": 0.2,
+        "gpt-6-sol@high": 0.8
       },
       "confidence": 0.6
     }
